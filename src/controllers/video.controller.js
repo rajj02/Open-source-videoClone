@@ -98,6 +98,64 @@ const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: update video details like title, description, thumbnail
 
+    const { title, description, duration} = req.body;
+    const thumbnailLocalPath =  req.file?.path;
+
+    console.log(req.file);
+
+    if(!(thumbnailLocalPath))
+    {
+        throw new ApiError(400, "please send the updated thumbnail");
+    }
+    const video = await Video.findById(videoId);
+
+    if(!video)
+    {
+        throw new ApiError(500,"video not found");
+    }
+    
+    const user =await  video?.owner;
+
+    if(!user)
+    {
+      throw new ApiError(501, "video owner not available, you are not allowed to update video")
+    }
+
+    if(user.toString() !== req.user._id.toString())
+    {
+        throw new ApiError(400, "you are not the owner of the video, not allowed to update the video")
+    }
+     
+    const thumbnailUpdated  = await uploadOnCloudinary(thumbnailLocalPath);
+    
+    if(!thumbnailUpdated)
+    {
+        throw new ApiError(400,"updated thumbnail is required");
+    }
+    const videoUpdated  = await Video.findByIdAndUpdate(
+        videoId,
+        {
+            $set:{
+                thumbnail : thumbnailUpdated.url,
+                title : title,
+                description : description,
+                duration : duration,
+               
+            }
+        },
+        {new : true});
+
+    if(!videoUpdated)
+    {
+        throw new ApiError(500,"something went wrong");
+    }
+
+    return res
+    .status(201)
+    .json(
+        new ApiResponse(201,videoUpdated, "video updated successfully")
+    )
+
 })
 
 const deleteVideo = asyncHandler(async (req, res) => {
